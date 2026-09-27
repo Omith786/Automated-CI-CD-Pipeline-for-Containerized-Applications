@@ -1,0 +1,29 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Environment-neutral definition of the service. Overlays add the namespace,
+# sizing and configuration for each environment.
+resources:
+  - serviceaccount.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - pdb.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/name: distance-api
+    includeSelectors: true
+  - pairs:
+      app.kubernetes.io/part-of: cicd-pipeline
+      app.kubernetes.io/managed-by: kustomize
+
+# Created with a content-hash suffix, so any config change alters the pod
+# template and triggers a rolling update (and can be rolled back with it).
+configMapGenerator:
+  - name: distance-api-config
+    literals:
+      - APP_ENVIRONMENT=local
+      - APP_LOG_LEVEL=INFO
+      - APP_LOG_FORMAT=json
+      - APP_MAX_ROUTE_WAYPOINTS=100

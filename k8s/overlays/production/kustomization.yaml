@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: production
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+labels:
+  - pairs:
+      app.kubernetes.io/environment: production
+
+configMapGenerator:
+  - name: distance-api-config
+    behavior: merge
+    literals:
+      - APP_ENVIRONMENT=production
+      - APP_LOG_LEVEL=INFO
+
+# "production" is a moving tag advanced by the pipeline after each successful
+# promotion. The pipeline itself deploys an immutable digest instead.
+images:
+  - name: distance-api
+    newName: ghcr.io/omith786/automated-ci-cd-pipeline-for-containerized-applications
+    newTag: production
+
+patches:
+  - path: deployment-patch.yaml
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: distance-api
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 10

@@ -1,0 +1,40 @@
+# Local development stack.
+#   docker compose up --build                          # the API on http://localhost:8000
+#   docker compose --profile observability up --build  # plus Prometheus on http://localhost:9090
+services:
+  api:
+    build:
+      context: .
+      args:
+        APP_VERSION: 0.0.0-compose
+    image: distance-api:local
+    ports:
+      - "8000:8000"
+    environment:
+      APP_ENVIRONMENT: local
+      APP_LOG_LEVEL: DEBUG
+      APP_LOG_FORMAT: text
+      APP_INSTANCE: compose
+    # Mirror the Kubernetes security context so problems show up locally first.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v3.15.0
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=1d
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      api:
+        condition: service_healthy

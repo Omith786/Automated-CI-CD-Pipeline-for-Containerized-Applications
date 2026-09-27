@@ -1,0 +1,34 @@
+name: Set up pipeline tools
+description: >-
+  Download the pinned command-line tools used by the pipeline (the same
+  versions `make tools` installs locally) into .tools/bin, cached between runs.
+
+inputs:
+  tools:
+    description: Space-separated list of tools to install (see scripts/install-tools.sh).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Cache tools
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: .tools/bin
+        # The script pins every version, so its hash identifies the tool set.
+        key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('scripts/install-tools.sh') }}-${{ inputs.tools }}
+
+    - name: Install tools
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      run: |
+        # Word splitting is intended: TOOLS is a space-separated list.
+        # shellcheck disable=SC2086
+        scripts/install-tools.sh $TOOLS
+
+    - name: Add tools to PATH
+      shell: bash
+      run: echo "${GITHUB_WORKSPACE}/.tools/bin" >> "${GITHUB_PATH}"

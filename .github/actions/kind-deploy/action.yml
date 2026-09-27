@@ -1,0 +1,116 @@
+name: Deploy to a kind environment
+description: >-
+  Create a throwaway kind cluster, recreate the environment's current release
+  in it (when one exists), then roll the new release over it with
+  scripts/deploy.sh: wait for the rollout, smoke-test every new pod, and
+  `kubectl rollout undo` automatically if anything fails.
+
+inputs:
+  environment:
+    description: Overlay to deploy (staging or production); also the namespace.
+    required: true
+  image:
+    description: Image to deploy, as repository@sha256:digest.
+    required: true
+  previous-image:
+    description: The release currently live in this environment, as repository@sha256:digest. Empty on the first ever deploy.
+    required: false
+    default: ""
+  expect-version:
+    description: Version the new pods must report on GET /.
+    required: true
+  simulate-failure:
+    description: If "true", smoke tests expect a version that does not exist, to demonstrate automatic rollback.
+    required: false
+    default: "false"
+  registry-username:
+    description: User for pulling from GHCR.
+    required: true
+  registry-password:
+    description: Token for pulling from GHCR (the workflow's GITHUB_TOKEN).
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Create kind cluster
+      uses: helm/kind-action@06c1ae10762d3b9c1644e7fe69596ae519e015a2 # v1.15.0
+      with:
+        version: v0.33.0
+        kubectl_version: v1.37.0
+        node_image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+        config: kind/cluster.yaml
+        cluster_name: ${{ inputs.environment }}
+        wait: 120s
+
+    - name: Prepare namespace and registry credentials
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.environment }}
+        REGISTRY_USERNAME: ${{ inputs.registry-username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry-password }}
+      run: |
+        kubectl create namespace "${NAMESPACE}" --dry-run=client -o yaml | kubectl apply -f -
+        # GHCR packages start out private, so the node needs credentials to pull.
+        kubectl --namespace "${NAMESPACE}" create secret docker-registry ghcr-pull \
+          --docker-server=ghcr.io \
+          --docker-username="${REGISTRY_USERNAME}" \
+          --docker-password="${REGISTRY_PASSWORD}" \
+          --dry-run=client -o yaml | kubectl apply -f -
+
+    # The cluster is new on every run, so first rebuild the environment as it
+    # stands: this is what gives `rollout undo` a real previous revision.
+    - name: Recreate the current ${{ inputs.environment }} release
+      if: inputs.previous-image != ''
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        PREVIOUS_IMAGE: ${{ inputs.previous-image }}
+      run: |
+        scripts/deploy.sh --overlay "k8s/overlays/${ENVIRONMENT}" --image "${PREVIOUS_IMAGE}" \
+          --pull-secret ghcr-pull --basic-checks --no-rollback
+
+    - name: Deploy, verify and roll back on failure
+      shell: bash
+      env:
+        ENVIRONMENT: ${{ inputs.environment }}
+        IMAGE: ${{ inputs.image }}
+        EXPECT_VERSION: ${{ inputs.simulate-failure == 'true' && 'simulated-bad-release' || inputs.expect-version }}
+      run: |
+        if [[ "${EXPECT_VERSION}" == simulated-bad-release ]]; then
+          echo "::warning::simulating a failed release: smoke tests will expect version ${EXPECT_VERSION}"
+        fi
+        scripts/deploy.sh --overlay "k8s/overlays/${ENVIRONMENT}" --image "${IMAGE}" \
+          --expect-version "${EXPECT_VERSION}" --pull-secret ghcr-pull
+
+    - name: Diagnostics
+      if: failure()
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.environment }}
+      run: |
+        set +e
+        kubectl --namespace "${NAMESPACE}" get all,hpa,pdb,endpointslices -o wide
+        kubectl --namespace "${NAMESPACE}" describe deployment distance-api
+        kubectl --namespace "${NAMESPACE}" get events --sort-by=.lastTimestamp | tail -n 40
+        kubectl --namespace "${NAMESPACE}" logs deployment/distance-api --all-containers --tail=100
+
+    - name: Summary
+      if: always()
+      shell: bash
+      env:
+        NAMESPACE: ${{ inputs.environment }}
+        IMAGE: ${{ inputs.image }}
+      run: |
+        {
+          echo "### ${NAMESPACE} deployment"
+          echo
+          echo "| | |"
+          echo "|---|---|"
+          echo "| Requested image | \`${IMAGE}\` |"
+          echo "| Running image | \`$(kubectl --namespace "${NAMESPACE}" get deployment distance-api -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null || echo none)\` |"
+          echo
+          echo '```'
+          kubectl --namespace "${NAMESPACE}" rollout history deployment/distance-api 2>&1 || true
+          echo '```'
+        } >> "${GITHUB_STEP_SUMMARY}"

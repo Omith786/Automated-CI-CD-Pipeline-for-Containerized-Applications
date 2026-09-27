@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: staging
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+labels:
+  - pairs:
+      app.kubernetes.io/environment: staging
+
+configMapGenerator:
+  - name: distance-api-config
+    behavior: merge
+    literals:
+      - APP_ENVIRONMENT=staging
+      - APP_LOG_LEVEL=DEBUG
+
+# The manifests use the logical image name "distance-api"; map it to the
+# registry here. "staging" is a moving tag the pipeline advances after each
+# successful staging deploy, so applying this overlay by hand gives the last
+# known-good release. The pipeline itself deploys an immutable digest instead.
+images:
+  - name: distance-api
+    newName: ghcr.io/omith786/automated-ci-cd-pipeline-for-containerized-applications
+    newTag: staging
+
+patches:
+  - target:
+      kind: Deployment
+      name: distance-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: distance-api
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3

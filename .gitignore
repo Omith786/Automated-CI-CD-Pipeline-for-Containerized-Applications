@@ -1,0 +1,32 @@
+# Virtual environment and downloaded tool binaries (recreate with `make install` / `make tools`)
+.venv/
+.tools/
+
+# Manifests rendered by scripts/deploy.sh and `make scan-config`
+.rendered/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Test and scan reports
+.coverage
+coverage.xml
+htmlcov/
+junit.xml
+sbom.spdx.json
+*.sarif
+
+# Local configuration
+.env
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store

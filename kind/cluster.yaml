@@ -1,0 +1,6 @@
+# Throwaway single-node cluster used by the pipeline (and `make kind-up`).
+# One node keeps start-up to well under a minute on a GitHub-hosted runner.
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane

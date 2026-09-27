@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: distance-api
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP

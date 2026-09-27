@@ -1,0 +1,7 @@
+# Allow-list: send only what the image needs to the build context. Anything new
+# in the repository is excluded by default, so secrets and caches cannot leak in.
+*
+!app/
+!requirements.txt
+**/__pycache__
+**/*.py[cod]

@@ -1,0 +1,55 @@
+[project]
+name = "distance-api"
+version = "0.1.0"
+description = "Great-circle distance service used to exercise a containerised CI/CD pipeline."
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Omith Chowdhury" }]
+requires-python = ">=3.12"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = [".tools"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "S",        # bandit security checks
+    "SIM",      # simplifications
+    "RUF",      # ruff-specific
+    "N",        # naming
+    "C4",       # comprehensions
+    "PT",       # pytest style
+]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest works; the script tests run fixed commands.
+"tests/**" = ["S101", "S603"]
+# The deployment helpers deliberately run kubectl from PATH.
+"scripts/**" = ["S607"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["app", "scripts", "tests"]
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "scripts"]
+addopts = "-ra --strict-markers"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["app", "scripts"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_also = ["if __name__ == .__main__.:"]

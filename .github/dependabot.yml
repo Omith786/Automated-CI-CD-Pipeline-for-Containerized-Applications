@@ -1,0 +1,39 @@
+# Weekly dependency update pull requests. Each one runs through CI like any
+# other change, so an upgrade that breaks tests or adds a vulnerability is
+# caught before merge. Minor and patch bumps are grouped to keep the noise down.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      python:
+        update-types: [minor, patch]
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Stay on the Python minor version the pipeline is tested with; move
+      # to a new one deliberately rather than through an automated bump.
+      - dependency-name: python
+        update-types: [version-update:semver-minor, version-update:semver-major]
+
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    # Composite actions pin third-party actions too, so scan them as well.
+    directories:
+      - /
+      - /.github/actions/*
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types: [minor, patch]
