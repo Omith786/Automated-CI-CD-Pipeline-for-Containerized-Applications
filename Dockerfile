@@ -4,7 +4,7 @@
 # identical bytes. Dependabot bumps the tag and digest together.
 
 # ---- Build stage: resolve dependencies into an isolated virtualenv --------
-FROM python:3.12.14-slim-trixie@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f AS builder
+FROM python:3.12.15-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -19,7 +19,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --require-virtualenv --only-binary=:all: -r /tmp/requirements.txt
 
 # ---- Runtime stage: just the interpreter, the venv and the code -----------
-FROM python:3.12.14-slim-trixie@sha256:f77ac9e44ae96ef2c90b8053ea08c31f8be030f824196b0ae4db6d462c84e51f AS runtime
+FROM python:3.12.15-slim-trixie@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1 AS runtime
 
 # A fixed numeric UID lets Kubernetes verify runAsNonRoot without a passwd lookup.
 RUN groupadd --system --gid 10001 app \
